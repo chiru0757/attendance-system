@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Attendance Manager</title>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+
+body{
+font-family:Segoe UI;
+background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+color:white;
+text-align:center;
+margin:0;
+}
+
+.container{
+width:95%;
+margin:auto;
+margin-top:20px;
+padding:20px;
+
+background:rgba(255,255,255,0.08);
+backdrop-filter:blur(12px);
+
+border-radius:15px;
+box-shadow:0 8px 32px rgba(0,0,0,0.4);
+}
+
+h2{
+margin-bottom:10px;
+}
+
+input,button{
+padding:10px;
+margin:5px;
+border:none;
+border-radius:8px;
+}
+
+input{
+background:rgba(255,255,255,0.2);
+color:white;
+}
+
+button{
+cursor:pointer;
+font-weight:bold;
+}
+
+.present{
+background:#27ae60;
+color:white;
+}
+
+.absent{
+background:#e74c3c;
+color:white;
+}
+
+.markall{
+background:#3498db;
+color:white;
+}
+
+.submit{
+background:#f1c40f;
+}
+
+.export{
+background:#9b59b6;
+}
+
+.view{
+background:#1abc9c;
+}
+
+table{
+width:100%;
+margin-top:20px;
+border-collapse:collapse;
+}
+
+th,td{
+padding:10px;
+border-bottom:1px solid rgba(255,255,255,0.2);
+}
+
+th{
+background:rgba(0,0,0,0.4);
+}
+
+.status{
+font-weight:bold;
+margin-left:10px;
+}
+
+.login{
+margin-top:120px;
+}
+
+canvas{
+margin-top:30px;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN PAGE -->
+
+<div id="loginPage" class="login">
+
+<h2>Teacher Login</h2>
+
+<input id="username" placeholder="Username"><br>
+<input id="password" type="password" placeholder="Password"><br>
+
+<button onclick="login()">Login</button>
+
+</div>
+
+
+<!-- DASHBOARD -->
+
+<div id="app" style="display:none">
+
+<div class="container">
+
+<h2>Student Attendance Dashboard</h2>
+
+<input type="date" id="date" onchange="renderStudents();updateChart()">
+
+<input id="search" placeholder="Search Student" onkeyup="renderStudents()">
+
+<br>
+
+<button class="markall" onclick="markAll()">Mark All Present</button>
+
+<button class="submit" onclick="submitAttendance()">Submit Attendance</button>
+
+<button class="view" onclick="viewRecords()">View Records</button>
+
+<button class="export" onclick="exportPDF()">Export PDF</button>
+
+<table>
+
+<thead>
+
+<tr>
+<th>ID</th>
+<th>Name</th>
+<th>Attendance</th>
+</tr>
+
+</thead>
+
+<tbody id="studentTable"></tbody>
+
+</table>
+
+<canvas id="chart"></canvas>
+
+</div>
+
+</div>
+
+
+<script>
+
+/* LOGIN */
+
+const LOGIN_ID="teacher"
+const PASSWORD="rnsfgca"
+
+function login(){
+
+let u=document.getElementById("username").value
+let p=document.getElementById("password").value
+
+if(u===LOGIN_ID && p===PASSWORD){
+
+loginPage.style.display="none"
+app.style.display="block"
+
+renderStudents()
+updateChart()
+
+}else{
+
+alert("Invalid Login")
+
+}
+
+}
+
+
+/* STUDENT LIST */
+
+let students=[
+
+{id:1,name:"ABHISHEK"},
+{id:2,name:"AKASH"},
+{id:3,name:"AKSHAY"},
+{id:4,name:"AMRUTHA"},
+{id:5,name:"ANU"},
+{id:6,name:"ANUSHA"},
+{id:7,name:"BALA KRISHNA"},
+{id:8,name:"BHARATH"},
+{id:9,name:"BHOOMIKA"},
+{id:10,name:"CHANDAN"},
+{id:11,name:"CHANDANA C"},
+{id:12,name:"CHANDANA K"},
+{id:13,name:"CHAYA"},
+{id:14,name:"CHETHAN"},
+{id:15,name:"CHIRAG"},
+{id:16,name:"DARSHAN"},
+{id:17,name:"DEEKSA"},
+{id:18,name:"DEEPIKA"},
+{id:19,name:"DEVARAJ"},
+{id:20,name:"DHANUSH"},
+{id:21,name:"DHANYA"},
+{id:22,name:"DINESH"},
+{id:23,name:"DISHA"},
+{id:24,name:"DIVYA"},
+{id:25,name:"GANAVI"},
+{id:26,name:"GANESH"},
+{id:27,name:"GAYATHRI"},
+{id:28,name:"GIRISH"},
+{id:29,name:"GOKUL"},
+{id:30,name:"GOWTHAM"}
+
+]
+
+
+/* STORAGE */
+
+let attendance=JSON.parse(localStorage.getItem("attendance"))||{}
+
+let chart
+
+function getDate(){
+
+return document.getElementById("date").value
+
+}
+
+
+/* TOGGLE */
+
+function toggle(id,status){
+
+let date=getDate()
+
+if(!date){
+
+alert("Select Date")
+return
+
+}
+
+if(!attendance[date]) attendance[date]={}
+
+attendance[date][id]=status
+
+renderStudents()
+updateChart()
+
+}
+
+
+/* MARK ALL */
+
+function markAll(){
+
+let date=getDate()
+
+if(!date){
+
+alert("Select Date")
+return
+
+}
+
+attendance[date]={}
+
+students.forEach(s=>attendance[date][s.id]="Present")
+
+renderStudents()
+updateChart()
+
+}
+
+
+/* SUBMIT */
+
+function submitAttendance(){
+
+localStorage.setItem("attendance",JSON.stringify(attendance))
+
+alert("Attendance Saved Successfully")
+
+}
+
+
+/* RENDER */
+
+function renderStudents(){
+
+let date=getDate()
+
+let search=document.getElementById("search").value.toLowerCase()
+
+let html=""
+
+students
+.filter(s=>s.name.toLowerCase().includes(search))
+.forEach(s=>{
+
+let status=attendance?.[date]?.[s.id]||""
+
+html+=`
+
+<tr>
+
+<td>${s.id}</td>
+
+<td>${s.name}</td>
+
+<td>
+
+<button class="present" onclick="toggle(${s.id},'Present')">Present</button>
+
+<button class="absent" onclick="toggle(${s.id},'Absent')">Absent</button>
+
+<span class="status">${status}</span>
+
+</td>
+
+</tr>
+
+`
+
+})
+
+studentTable.innerHTML=html
+
+}
+
+
+/* VIEW RECORDS */
+
+function viewRecords(){
+
+let data="Attendance Records\n\n"
+
+for(let date in attendance){
+
+data+=date+"\n"
+
+students.forEach(s=>{
+
+let st=attendance[date][s.id]||"Absent"
+
+data+=s.name+" : "+st+"\n"
+
+})
+
+data+="\n"
+
+}
+
+alert(data)
+
+}
+
+
+/* CHART */
+
+function updateChart(){
+
+let date=getDate()
+
+let present=0
+let absent=0
+
+students.forEach(s=>{
+
+let st=attendance?.[date]?.[s.id]
+
+if(st==="Present") present++
+if(st==="Absent") absent++
+
+})
+
+if(chart) chart.destroy()
+
+chart=new Chart(chartCanvas={
+
+type:"doughnut",
+
+data:{
+labels:["Present","Absent"],
+datasets:[{data:[present,absent]}]
+}
+
+})
+
+}
+
+
+/* PDF */
+
+function exportPDF(){
+
+let date=getDate()
+
+if(!date){
+
+alert("Select Date")
+return
+
+}
+
+const {jsPDF}=window.jspdf
+
+let doc=new jsPDF()
+
+doc.text("Attendance Report "+date,20,20)
+
+let y=30
+
+students.forEach(s=>{
+
+let st=attendance?.[date]?.[s.id]||"Absent"
+
+doc.text(s.id+" "+s.name+" "+st,20,y)
+
+y+=8
+
+})
+
+doc.save("attendance.pdf")
+
+}
+
+</script>
+
+</body>
+</html>
